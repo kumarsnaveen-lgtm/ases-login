@@ -1,0 +1,82 @@
+<!doctype html>
+<!--
+  ASES one-tap Kite login (002 FR-009a). The Kite app's redirect URL points here. This page reads the
+  request_token Kite appends, removes it from browser history, and hands it to the ASES bot as a Telegram
+  deep link (/start <token>). It holds no secret: the token is useless without KITE_API_SECRET, which never
+  leaves the VM. No external scripts, no analytics, no referrer.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+<meta name="robots" content="noindex, nofollow">
+<title>ASES Kite Login</title>
+<style>
+  :root { --bg: #f7f7f5; --fg: #1d1d1b; --muted: #6b6b66; --card: #ffffff; --line: #deddd8; --accent: #2a6df4; --bad: #b3261e; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #161615; --fg: #ecebe6; --muted: #a09f99; --card: #201f1d; --line: #34332f; --accent: #7aa5ff; --bad: #ff8a80; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 system-ui, -apple-system, sans-serif; }
+  main { max-width: 420px; margin: 0 auto; padding: 32px 16px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px; }
+  h1 { font-size: 20px; margin: 0 0 8px; }
+  p { margin: 8px 0; color: var(--muted); }
+  .btn { display: block; width: 100%; margin-top: 12px; padding: 14px; border-radius: 10px; border: 1px solid var(--line);
+         background: var(--card); color: var(--fg); font: inherit; text-align: center; text-decoration: none; cursor: pointer; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  code { display: block; margin-top: 12px; padding: 10px; border-radius: 8px; background: var(--bg); word-break: break-all; font-size: 13px; }
+  .bad { color: var(--bad); }
+  [hidden] { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <div class="card" id="ok" hidden>
+    <h1>Sending the token to ASES…</h1>
+    <p>Telegram should open. Tap <b>Start</b> if it asks; the bot replies "Token accepted".</p>
+    <a class="btn primary" id="open">Open in Telegram</a>
+    <button class="btn" id="copy" type="button">Copy /login command instead</button>
+    <code id="cmd"></code>
+    <p id="copied" hidden>Copied. Paste it into the ASES chat now; the token expires in a few minutes.</p>
+  </div>
+  <div class="card" id="fail" hidden>
+    <h1 class="bad">No usable token</h1>
+    <p id="why"></p>
+    <p>Log in to Kite again from the link in the ASES heartbeat.</p>
+  </div>
+</main>
+<script>
+(function () {
+  var BOT = "navstockases_bot";                  // the ASES bot's username; not a secret
+  var q = new URLSearchParams(window.location.search);
+  var token = q.get("request_token") || "";
+  var status = q.get("status") || "";
+  try { history.replaceState(null, "", window.location.pathname); } catch (e) {}   // token out of history
+  if (status && status !== "success") { return fail("Kite reported status \"" + status + "\"."); }
+  if (!/^[A-Za-z0-9]{16,64}$/.test(token)) { return fail("The page was opened without a valid request_token."); }
+
+  var https = "https://t.me/" + BOT + "?start=" + token;
+  var app = "tg://resolve?domain=" + BOT + "&start=" + token;
+  document.getElementById("open").href = https;
+  document.getElementById("cmd").textContent = "/login " + token;
+  document.getElementById("ok").hidden = false;
+  document.getElementById("copy").addEventListener("click", function () {
+    var note = document.getElementById("copied");
+    var done = function () { note.hidden = false; };
+    var manual = function () { note.textContent = "Copy failed: select the command above and copy it."; note.hidden = false; };
+    if (navigator.clipboard) { navigator.clipboard.writeText("/login " + token).then(done, manual); } else { manual(); }
+  });
+  window.location.href = app;                    // opens the Telegram app directly when installed
+
+  function fail(why) {
+    document.getElementById("why").textContent = why;
+    document.getElementById("fail").hidden = false;
+  }
+})();
+</script>
+</body>
+</html>
